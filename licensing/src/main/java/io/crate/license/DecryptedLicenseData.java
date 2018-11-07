@@ -32,6 +32,7 @@ import org.elasticsearch.common.xcontent.XContentType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Objects;
 
 public class DecryptedLicenseData {
@@ -119,5 +120,10 @@ public class DecryptedLicenseData {
     @Override
     public int hashCode() {
         return Objects.hash(expirationDateInMs, issuedTo);
+    }
+
+    @Override
+    public String toString() {
+        return String.format(Locale.ENGLISH, "%s (expires on %tF)", issuedTo, expirationDateInMs);
     }
 }

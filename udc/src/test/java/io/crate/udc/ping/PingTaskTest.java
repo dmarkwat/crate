@@ -22,6 +22,8 @@
 package io.crate.udc.ping;
 
 import io.crate.http.HttpTestServer;
+import io.crate.license.DecryptedLicenseData;
+import io.crate.license.LicenseService;
 import io.crate.monitor.ExtendedNetworkInfo;
 import io.crate.monitor.ExtendedNodeInfo;
 import io.crate.monitor.ExtendedOsInfo;
@@ -30,9 +32,7 @@ import io.crate.settings.SharedSettings;
 import io.crate.test.integration.CrateDummyClusterServiceUnitTest;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.set.Sets;
 import org.hamcrest.Matchers;
 import org.junit.After;
 import org.junit.Before;
@@ -40,6 +40,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.notNullValue;
@@ -50,9 +51,7 @@ import static org.mockito.Mockito.when;
 public class PingTaskTest extends CrateDummyClusterServiceUnitTest {
 
     private ExtendedNodeInfo extendedNodeInfo;
-    private ClusterSettings clusterSettings = new ClusterSettings(
-        Settings.EMPTY,
-        Sets.newHashSet());
+    private LicenseService licenseService;
 
     private HttpTestServer testServer;
 
@@ -61,13 +60,20 @@ public class PingTaskTest extends CrateDummyClusterServiceUnitTest {
             clusterService,
             extendedNodeInfo,
             pingUrl,
-            clusterSettings,
-            settings
+            settings,
+            licenseService
         );
     }
 
     private PingTask createPingTask() {
         return createPingTask("http://dummy", Settings.EMPTY);
+    }
+
+    private DecryptedLicenseData createLicense() {
+        return new DecryptedLicenseData(
+            System.currentTimeMillis() + TimeUnit.DAYS.toMillis(30),
+            "crate"
+        );
     }
 
     @After
@@ -82,6 +88,8 @@ public class PingTaskTest extends CrateDummyClusterServiceUnitTest {
         extendedNodeInfo = mock(ExtendedNodeInfo.class);
         when(extendedNodeInfo.networkInfo()).thenReturn(new ExtendedNetworkInfo(ExtendedNetworkInfo.NA_INTERFACE));
         when(extendedNodeInfo.osInfo()).thenReturn(new ExtendedOsInfo(SysInfo.gather()));
+        licenseService = mock(LicenseService.class);
+        when(licenseService.currentLicense()).thenReturn(createLicense());
     }
 
     @Test
@@ -101,6 +109,21 @@ public class PingTaskTest extends CrateDummyClusterServiceUnitTest {
         );
         assertThat(pingTask.isEnterprise(), is("false"));
     }
+
+    @Test
+    public void testGetLicenseInfoWhenLicenseIsNotNull() {
+        PingTask pingTask = createPingTask();
+        assertThat(pingTask.getLicenseInfo(), is(createLicense().toString()));
+    }
+
+    @Test
+    public void testGetLicenseInfoWhenLicenseIsNull() {
+        when(licenseService.currentLicense()).thenReturn(null);
+
+        PingTask pingTask = createPingTask();
+        assertThat(pingTask.getLicenseInfo(), is(""));
+    }
+
 
     @Test
     public void testSuccessfulPingTaskRun() throws Exception {
@@ -146,6 +169,7 @@ public class PingTaskTest extends CrateDummyClusterServiceUnitTest {
             assertThat(map.get("crate_version"), is(notNullValue()));
             assertThat(map, hasKey("java_version"));
             assertThat(map.get("java_version"), is(notNullValue()));
+            assertThat(map.get("license_info"), is(createLicense().toString()));
         }
     }
 

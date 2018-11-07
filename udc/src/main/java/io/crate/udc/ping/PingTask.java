@@ -25,6 +25,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import io.crate.Version;
+import io.crate.license.DecryptedLicenseData;
+import io.crate.license.LicenseService;
 import io.crate.monitor.ExtendedNodeInfo;
 import io.crate.settings.SharedSettings;
 import org.apache.logging.log4j.Logger;
@@ -32,7 +34,6 @@ import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.logging.Loggers;
-import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -64,6 +65,7 @@ public class PingTask extends TimerTask {
     private final ExtendedNodeInfo extendedNodeInfo;
     private final String pingUrl;
     private final Settings settings;
+    private final LicenseService licenseService;
 
     private AtomicLong successCounter = new AtomicLong(0);
     private AtomicLong failCounter = new AtomicLong(0);
@@ -71,16 +73,23 @@ public class PingTask extends TimerTask {
     public PingTask(ClusterService clusterService,
                     ExtendedNodeInfo extendedNodeInfo,
                     String pingUrl,
-                    ClusterSettings clusterSettings,
-                    Settings settings) {
+                    Settings settings,
+                    LicenseService licenseService) {
         this.clusterService = clusterService;
         this.pingUrl = pingUrl;
         this.settings = settings;
         this.extendedNodeInfo = extendedNodeInfo;
+        this.licenseService = licenseService;
     }
 
     private Map<String, String> getKernelData() {
         return extendedNodeInfo.osInfo().kernelData();
+    }
+
+    @VisibleForTesting
+    String getLicenseInfo() {
+        DecryptedLicenseData license = licenseService.currentLicense();
+        return (license == null) ? "" : license.toString();
     }
 
     private String getClusterId() {
@@ -123,6 +132,7 @@ public class PingTask extends TimerTask {
         queryMap.put("hardware_address", getHardwareAddress());
         queryMap.put("crate_version", Version.CURRENT.number());
         queryMap.put("java_version", System.getProperty("java.version"));
+        queryMap.put("license_info", getLicenseInfo());
 
         if (logger.isDebugEnabled()) {
             logger.debug("Sending data: {}", queryMap);

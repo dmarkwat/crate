@@ -26,6 +26,7 @@ import org.hamcrest.Matchers;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.core.Is.is;
@@ -39,6 +40,17 @@ public class DecryptedLicenseDataTest {
             System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1),
             "crate");
         assertThat(nonExpiredLicenseData.isExpired(), is(false));
+    }
+
+    @Test
+    public void testLicenseToString() {
+        DecryptedLicenseData licenseData = new DecryptedLicenseData(
+            System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1),
+            "crate");
+        assertThat(
+            licenseData.toString(),
+            is(String.format(Locale.ENGLISH,"%s (expires on %tF)", "crate", System.currentTimeMillis()))
+        );
     }
 
     @Test
